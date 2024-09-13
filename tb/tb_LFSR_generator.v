@@ -12,8 +12,12 @@ module tb_LFSR_generator;
     reg     [7:0] i_seed                                                                        ;
     wire    [7:0] o_LFSR                                                                        ;   
     reg     [7:0] seed_reg                                                                      ;
-    //! Instancia del módulo a testear
-LFSR_generator uut 
+    
+   // Señales para el checker
+    wire    o_lock                                                                              ;
+  
+// Instancia del módulo LFSR_generator
+LFSR_generator uut_generator 
 (
     .clk(clk)                                                                                   ,
     .i_valid(i_valid)                                                                           ,
@@ -22,8 +26,20 @@ LFSR_generator uut
     .i_seed(i_seed)                                                                             ,
     .o_LFSR(o_LFSR)
 );
-// Clock de 10MHz
-always #5 clk=~clk                                                                             ;
+
+
+// Instancia del módulo LFSR_Checker
+LFSR_Checker uut_checker
+(
+    .clk(clk)                                                                                   ,
+    .i_valid(i_valid)                                                                           ,
+    .i_LFSR(o_LFSR)                                                                             ,
+    .i_rst(i_rst)                                                                               ,
+    .o_lock(o_lock)
+);
+
+// Clock de 100MHz
+always #5 clk=~clk                                                                              ;
 
 //! Task para cambiar el valor de i_seed
 task change_seed(input [7:0] new_seed)                                                          ;
@@ -149,44 +165,53 @@ task test_periodicity_random_seeds;
     end
 endtask
 
+// Monitoreo de señales durante toda la simulación
+initial begin
+    $monitor("Time: %0d, o_lock: %b, valid_counter: %d, invalid_counter: %d", $time, o_lock, uut_checker.valid_counter, uut_checker.invalid_counter);
+end
 
 // Proceso principal de prueba
 initial begin 
     // Inicialización de señales
+    
     $display("Enters initial cycle")                                                            ;
     clk             = 0                                                                         ;
     i_valid         = 0                                                                         ;
     i_rst           = 0                                                                         ;  
     i_soft_reset    = 0                                                                         ;
     i_seed          = 8'b11111111                                                               ; // Valor inicial del seed
-    
+    seed_reg        = 8'b00000000                                                               ; 
    
 
     // Realizar un reset asincrónico al inicio
-    async_reset                                                                                 ;  
+    //async_reset                                                                                 ;  
     //@(posedge clk) i_valid = 1                                                                      ;
-    sync_reset    
+    //sync_reset    
                                                                                                 ;
     // Generar valid aleatorio y realizar pruebas
-    repeat(255) begin
-        @(posedge clk)                                                                          ; //Se genere una señal de valid, en donde aleatoriamente suvalor cambie o no en cada ciclo de clock.
-        i_valid = $random % 2                                                                   ; // Cambia aleatoriamente entre 0 y 1
-        #100                                                                                    ;
-        if (i_valid) begin
-            seed_reg = o_LFSR                                                                   ; // Guarda el valor del LFSR
-            change_seed(seed_reg)                                                               ; // Cambia el seed aleatoriamente
-            sync_reset                                                                          ; // Realiza un reset sincrónico
-        end
-    end
-
+    // repeat(255) begin
+    //     @(posedge clk)                                                                          ; //Se genere una señal de valid, en donde aleatoriamente suvalor cambie o no en cada ciclo de clock.
+    //     i_valid = $random % 2                                                                   ; // Cambia aleatoriamente entre 0 y 1
+    //     #100                                                                                    ;
+    //     if (i_valid) begin
+    //         seed_reg = o_LFSR                                                                   ; // Guarda el valor del LFSR
+    //         change_seed(seed_reg)                                                               ; // Cambia el seed aleatoriamente
+    //         sync_reset                                                                          ; // Realiza un reset sincrónico
+    //     end
+    // end
+    #10        ;    
+    i_rst   = 1;
+    #10        ;    
+    i_rst   = 0;    
+    #10        ;                                                                                      
+    i_valid = 1; 
+    #2560      ;                                                                                          
+    
 
     // Ejecuta las pruebas de periodicidad
-    test_periodicity_init_value                                                                 ; // Prueba con una semilla fija específica
-    test_periodicity_random_seeds                                                               ; // Llamada a la tarea para probar la periodicidad con semillas aleatorias
-   
+    //test_periodicity_init_value                                                                 ; // Prueba con una semilla fija específica
+    //test_periodicity_random_seeds                                                               ; // Llamada a la tarea para probar la periodicidad con semillas aleatorias
     
-        
-
     // Finaliza la simulación
     $finish                                                                                     ;        
 end
